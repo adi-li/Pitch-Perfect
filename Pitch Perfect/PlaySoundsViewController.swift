@@ -10,27 +10,32 @@ import AVFoundation
 import UIKit
 
 class PlaySoundsViewController: UIViewController {
-
+    
     var receivedAudio: RecordedAudio!
-    var audioPlayer: AVAudioPlayer!
     
     var audioEngine: AVAudioEngine!
     var audioFile: AVAudioFile!
+    var audioPlayerNode: AVAudioPlayerNode!
+    
+    @IBOutlet weak var resumeButton: UIButton!
+    @IBOutlet weak var pauseButton: UIButton!
+    @IBOutlet weak var stopButton: UIButton!
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
         
-        // Load audio file to player
-        audioPlayer = AVAudioPlayer(contentsOfURL: receivedAudio.filePathUrl, error: nil)
-        audioPlayer.enableRate = true
-        
         // Create audio engine for pitch sound effect
         audioEngine = AVAudioEngine()
         audioFile = AVAudioFile(forReading: receivedAudio.filePathUrl, error: nil)
     }
-
+    
+    override func viewWillAppear(animated: Bool) {
+        super.viewWillAppear(animated)
+        setupAudioEngineWithEffect(nil)
+    }
+    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
@@ -38,62 +43,105 @@ class PlaySoundsViewController: UIViewController {
     
     func resetAudioPlayer() {
         // Reset player
-        audioPlayer.stop()
-        audioPlayer.currentTime = 0
-        audioPlayer.rate = 1
-        
-        // Reset engine
         audioEngine.stop()
         audioEngine.reset()
+        audioPlayerNode?.reset()
     }
     
-    func playAudioWithRate(rate: Float) {
-        self.resetAudioPlayer()
-        audioPlayer.rate = rate
-        audioPlayer.play()
+    func setupAudioEngineWithEffect(effect: AVAudioNode?) {
+        // Set normal audio node
+        audioPlayerNode = AVAudioPlayerNode()
+        audioEngine.attachNode(audioPlayerNode)
+        
+        // Add effect
+        var audioEffect = effect
+        if effect == nil {
+            audioEffect = AVAudioUnitTimePitch()
+        }
+        audioEngine.attachNode(audioEffect)
+        
+        // Connect the nodes in a filter flow
+        audioEngine.connect(audioPlayerNode, to: audioEffect, format: nil)
+        audioEngine.connect(audioEffect, to: audioEngine.outputNode, format: nil)
+        
+        // Set the file into player node
+        audioPlayerNode.scheduleFile(audioFile, atTime: nil, completionHandler: nil)
+    }
+    
+    func playAudioWithEffect(effect: AVAudioNode?) {
+        resetAudioPlayer()
+        
+        // Add effect
+        setupAudioEngineWithEffect(effect)
+        
+        // Start playing
+        audioEngine.startAndReturnError(nil)
+        audioPlayerNode.play()
     }
     
     func playAudioWithPitch(pitch: Float) {
-        self.resetAudioPlayer()
+        // Setup pitch effect
+        let effect = AVAudioUnitTimePitch()
+        effect.pitch = pitch
         
-        // Set normal audio node
-        let playerNode = AVAudioPlayerNode()
-        audioEngine.attachNode(playerNode)
+        playAudioWithEffect(effect)
+    }
+    
+    func playAudioWithRate(rate: Float) {
+        // Setup pitch effect
+        let effect = AVAudioUnitTimePitch()
+        effect.rate = rate
         
-        // Add effect
-        let pitchEffect = AVAudioUnitTimePitch()
-        pitchEffect.pitch = pitch
-        audioEngine.attachNode(pitchEffect)
-        
-        // Connect the nodes in a filter flow
-        audioEngine.connect(playerNode, to: pitchEffect, format: nil)
-        audioEngine.connect(pitchEffect, to: audioEngine.outputNode, format: nil)
-        
-        // Set the file into player node
-        playerNode.scheduleFile(audioFile, atTime: nil, completionHandler: nil)
-        audioEngine.startAndReturnError(nil)
-        
-        // Start playing
-        playerNode.play()
+        playAudioWithEffect(effect)
     }
     
     @IBAction func playSlowAudio(sender: UIButton) {
-        self.playAudioWithRate(0.5)
+        playAudioWithRate(0.5)
     }
     
     @IBAction func playFastAudio(sender: UIButton) {
-        self.playAudioWithRate(1.5)
+        playAudioWithRate(1.5)
     }
 
     @IBAction func playChipmunkAudio(sender: UIButton) {
-        self.playAudioWithPitch(1000)
+        playAudioWithPitch(1000)
     }
     
     @IBAction func playDarthVaderAudio(sender: UIButton) {
-        self.playAudioWithPitch(-1000)
+        playAudioWithPitch(-1000)
+    }
+    
+    @IBAction func playReverbAudio(sender: UIButton) {
+        let effect = AVAudioUnitReverb()
+        effect.loadFactoryPreset(.MediumHall3)
+        effect.wetDryMix = 80
+        
+        playAudioWithEffect(effect)
+    }
+    
+    @IBAction func playEchoAudio(sender: UIButton) {
+        let effect = AVAudioUnitDistortion()
+        effect.preGain = -10
+        effect.loadFactoryPreset(.MultiEcho1)
+        
+        playAudioWithEffect(effect)
     }
     
     @IBAction func stopPlaying(sender: UIButton) {
-        self.resetAudioPlayer()
+        resetAudioPlayer()
+        setupAudioEngineWithEffect(nil)
     }
+    
+    @IBAction func resumeAudio(sender: UIButton) {
+        if (!audioEngine.running) {
+            audioEngine.startAndReturnError(nil)
+        }
+    }
+    
+    @IBAction func pauseAudio(sender: AnyObject) {
+        if (audioEngine.running) {
+            audioEngine.pause()
+        }
+    }
+
 }

@@ -9,6 +9,19 @@
 import UIKit
 
 class RecordedAudio: NSObject {
-    var filePathUrl: NSURL!
-    var title: String!
+    var filePathUrl: NSURL
+    var title: String
+    
+    init(filePathUrl: NSURL, title: String) {
+        self.filePathUrl = filePathUrl
+        self.title = title
+    }
+    
+    convenience init(filePathUrl: NSURL) {
+        var title = "audio.wav"
+        if let last = filePathUrl.lastPathComponent {
+            title = last
+        }
+        self.init(filePathUrl: filePathUrl, title: title)
+    }
 }
